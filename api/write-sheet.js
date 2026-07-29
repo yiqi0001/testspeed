@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
     // 你的 Google Apps Script 写入地址（action=testWrite）
     // 每次写入带随机参数，避免重复
     const timestamp = Date.now();
-    const SHEET_API_URL = `https://script.google.com/macros/s/你的地址/exec?action=testWrite&name=Vercel测试&action=速度测试_${timestamp}`;
+    const SHEET_API_URL = `https://script.google.com/macros/s/https://script.google.com/macros/s/AKfycby_d-Q0vryRXKrayiIJYvz54zf8ji6q95rh_2wc4OsstFKEpsr9LH98enHnXxqE4fhe/exec?action=testWrite&name=Vercel测试&action=速度测试_${timestamp}`;
 
     // 发起写入请求到 Google Sheets
     const response = await fetch(SHEET_API_URL, {
