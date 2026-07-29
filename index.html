@@ -104,30 +104,30 @@
       const startTime = performance.now();
 
       try {
-        // 测试1：获取地理位置信息（看看Vercel把请求路由到了哪里）
-        const geoResp = await fetch('https://ipapi.co/json/');
+        // 测试1：获取地理位置信息（使用 ip-api.com，对中东网络友好）
+        const geoResp = await fetch('https://ip-api.com/json/', {
+          signal: AbortSignal.timeout(8000)
+        });
         const geoData = await geoResp.json();
         const city = geoData.city || '未知';
-        const country = geoData.country_name || '未知';
-        const isp = geoData.org || '未知';
+        const country = geoData.country || '未知';
+        const isp = geoData.isp || '未知';
         location.textContent = `📍 ${city}, ${country} | ${isp}`;
 
-        // 测试2：从Vercel加载一个数据（用当前页面本身作为测试）
-        // 加一个随机参数防止缓存
+        // 测试2：从Vercel加载数据（加随机参数防止缓存）
         const testUrl = window.location.href + '?t=' + Date.now();
         const resp = await fetch(testUrl, {
           method: 'HEAD',
-          cache: 'no-cache'
+          cache: 'no-cache',
+          signal: AbortSignal.timeout(10000)
         });
 
         const endTime = performance.now();
         const elapsed = ((endTime - startTime) / 1000).toFixed(2);
 
-        // 显示结果
         timeDisplay.textContent = elapsed + 's';
         status.textContent = '✅ 加载完成';
 
-        // 判断速度等级
         let badgeText, badgeClass;
         if (elapsed < 1) {
           badgeText = '🚀 极快 (Vercel CDN 命中)';
@@ -149,26 +149,53 @@
           `测试时间: ${new Date().toLocaleString('zh-CN')}`;
 
       } catch (err) {
+        // 如果 IP 查询失败，仍然尝试测试页面加载速度
+        if (err.message.includes('ip-api') || err.name === 'AbortError') {
+          // IP查询失败，用备用方法
+          try {
+            const testUrl = window.location.href + '?t=' + Date.now();
+            const resp = await fetch(testUrl, {
+              method: 'HEAD',
+              cache: 'no-cache',
+              signal: AbortSignal.timeout(10000)
+            });
+            const endTime = performance.now();
+            const elapsed = ((endTime - startTime) / 1000).toFixed(2);
+            timeDisplay.textContent = elapsed + 's';
+            status.textContent = '✅ 加载完成 (位置信息获取失败)';
+            location.textContent = '📍 位置信息获取失败，但速度测试正常';
+            let badgeText, badgeClass;
+            if (elapsed < 1) { badgeText = '🚀 极快'; badgeClass = 'fast'; }
+            else if (elapsed < 3) { badgeText = '⚡ 较快'; badgeClass = 'fast'; }
+            else if (elapsed < 6) { badgeText = '📡 一般'; badgeClass = 'slow'; }
+            else { badgeText = '🐢 较慢'; badgeClass = 'slow'; }
+            badgeArea.innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span>`;
+            detail.textContent = `从 Vercel 获取页面耗时 ${elapsed} 秒`;
+            document.getElementById('timestamp').textContent =
+              `测试时间: ${new Date().toLocaleString('zh-CN')}`;
+            return;
+          } catch (e2) {
+            // 完全失败
+          }
+        }
         status.textContent = '❌ 测试失败: ' + err.message;
         timeDisplay.textContent = '--';
-        detail.textContent = '请检查网络连接';
+        detail.textContent = '请检查网络连接，或手动刷新重试';
       }
     }
 
-    // 页面加载时自动测试一次
     window.onload = function() {
-      // 先获取位置信息
-      fetch('https://ipapi.co/json/')
+      // 尝试获取位置
+      fetch('https://ip-api.com/json/')
         .then(r => r.json())
         .then(data => {
           document.getElementById('location').textContent =
-            `📍 ${data.city || '未知'}, ${data.country_name || '未知'}`;
+            `📍 ${data.city || '未知'}, ${data.country || '未知'}`;
         })
         .catch(() => {
-          document.getElementById('location').textContent = '📍 无法获取位置';
+          document.getElementById('location').textContent = '📍 无法获取位置（不影响速度测试）';
         });
 
-      // 延迟1秒自动测试
       setTimeout(testSpeed, 1000);
     };
   </script>
