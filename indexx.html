@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vercel 速度测试</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, sans-serif;
+      max-width: 480px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+      text-align: center;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 30px 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+    h1 { font-size: 28px; margin: 0 0 8px 0; }
+    .status {
+      font-size: 18px;
+      color: #1a73e8;
+      margin: 16px 0;
+      padding: 16px;
+      background: #e8f0fe;
+      border-radius: 10px;
+    }
+    .time {
+      font-size: 48px;
+      font-weight: 700;
+      color: #34a853;
+      margin: 12px 0;
+    }
+    .sub {
+      color: #888;
+      font-size: 14px;
+    }
+    button {
+      padding: 14px 40px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      background: #1a73e8;
+      color: white;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    button:active { transform: scale(0.97); }
+    .info {
+      margin-top: 20px;
+      font-size: 13px;
+      color: #aaa;
+      border-top: 1px solid #eee;
+      padding-top: 16px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .badge.fast { background: #e8f5e9; color: #2e7d32; }
+    .badge.slow { background: #fff3e0; color: #e65100; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🌍 Vercel 测试</h1>
+    <p class="sub">检测从沙特访问 Vercel 部署的网页速度</p>
+
+    <div class="status" id="status">点击下方按钮测试</div>
+
+    <div class="time" id="timeDisplay">--</div>
+    <div class="sub" id="detail"></div>
+
+    <button onclick="testSpeed()">🚀 测试访问速度</button>
+
+    <div id="badgeArea"></div>
+
+    <div class="info">
+      <span id="location">📍 检测中...</span><br>
+      <span id="timestamp"></span>
+    </div>
+  </div>
+
+  <script>
+    async function testSpeed() {
+      const status = document.getElementById('status');
+      const timeDisplay = document.getElementById('timeDisplay');
+      const detail = document.getElementById('detail');
+      const badgeArea = document.getElementById('badgeArea');
+      const location = document.getElementById('location');
+
+      status.textContent = '⏳ 正在测试...';
+      timeDisplay.textContent = '...';
+      detail.textContent = '';
+      badgeArea.innerHTML = '';
+
+      const startTime = performance.now();
+
+      try {
+        // 测试1：获取地理位置信息（看看Vercel把请求路由到了哪里）
+        const geoResp = await fetch('https://ipapi.co/json/');
+        const geoData = await geoResp.json();
+        const city = geoData.city || '未知';
+        const country = geoData.country_name || '未知';
+        const isp = geoData.org || '未知';
+        location.textContent = `📍 ${city}, ${country} | ${isp}`;
+
+        // 测试2：从Vercel加载一个数据（用当前页面本身作为测试）
+        // 加一个随机参数防止缓存
+        const testUrl = window.location.href + '?t=' + Date.now();
+        const resp = await fetch(testUrl, {
+          method: 'HEAD',
+          cache: 'no-cache'
+        });
+
+        const endTime = performance.now();
+        const elapsed = ((endTime - startTime) / 1000).toFixed(2);
+
+        // 显示结果
+        timeDisplay.textContent = elapsed + 's';
+        status.textContent = '✅ 加载完成';
+
+        // 判断速度等级
+        let badgeText, badgeClass;
+        if (elapsed < 1) {
+          badgeText = '🚀 极快 (Vercel CDN 命中)';
+          badgeClass = 'fast';
+        } else if (elapsed < 3) {
+          badgeText = '⚡ 较快 (CDN 节点较近)';
+          badgeClass = 'fast';
+        } else if (elapsed < 6) {
+          badgeText = '📡 一般 (节点可能较远)';
+          badgeClass = 'slow';
+        } else {
+          badgeText = '🐢 较慢 (可能需要优化)';
+          badgeClass = 'slow';
+        }
+        badgeArea.innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span>`;
+        detail.textContent = `从 Vercel 获取页面耗时 ${elapsed} 秒`;
+
+        document.getElementById('timestamp').textContent =
+          `测试时间: ${new Date().toLocaleString('zh-CN')}`;
+
+      } catch (err) {
+        status.textContent = '❌ 测试失败: ' + err.message;
+        timeDisplay.textContent = '--';
+        detail.textContent = '请检查网络连接';
+      }
+    }
+
+    // 页面加载时自动测试一次
+    window.onload = function() {
+      // 先获取位置信息
+      fetch('https://ipapi.co/json/')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('location').textContent =
+            `📍 ${data.city || '未知'}, ${data.country_name || '未知'}`;
+        })
+        .catch(() => {
+          document.getElementById('location').textContent = '📍 无法获取位置';
+        });
+
+      // 延迟1秒自动测试
+      setTimeout(testSpeed, 1000);
+    };
+  </script>
+</body>
+</html>
