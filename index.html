@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vercel 速度测试</title>
+  <title>Google Sheets 写入速度测试</title>
   <style>
     * { box-sizing: border-box; }
     body {
       font-family: -apple-system, sans-serif;
-      max-width: 480px;
+      max-width: 500px;
       margin: 40px auto;
       padding: 20px;
-      background: #f5f5f5;
+      background: #f0f2f5;
       text-align: center;
     }
     .card {
@@ -20,184 +20,179 @@
       padding: 30px 20px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.1);
     }
-    h1 { font-size: 28px; margin: 0 0 8px 0; }
-    .status {
-      font-size: 18px;
-      color: #1a73e8;
-      margin: 16px 0;
-      padding: 16px;
-      background: #e8f0fe;
-      border-radius: 10px;
-    }
-    .time {
-      font-size: 48px;
-      font-weight: 700;
-      color: #34a853;
-      margin: 12px 0;
-    }
-    .sub {
-      color: #888;
-      font-size: 14px;
-    }
+    h1 { font-size: 22px; margin: 0 0 6px 0; }
+    .sub { color: #888; font-size: 14px; margin-bottom: 20px; }
     button {
-      padding: 14px 40px;
-      font-size: 18px;
+      padding: 16px 48px;
+      font-size: 20px;
+      font-weight: 600;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       background: #1a73e8;
       color: white;
       cursor: pointer;
-      margin-top: 12px;
+      touch-action: manipulation;
     }
     button:active { transform: scale(0.97); }
-    .info {
+    button:disabled { opacity: 0.6; }
+    .result {
       margin-top: 20px;
-      font-size: 13px;
-      color: #aaa;
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 15px;
+      background: #f8f9fa;
+      min-height: 60px;
+      line-height: 1.8;
+      text-align: left;
+      word-break: break-all;
+    }
+    .result.success { background: #e8f5e9; border-left: 4px solid #34a853; }
+    .result.error { background: #ffebee; border-left: 4px solid #ea4335; }
+    .result .big {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a73e8;
+    }
+    .result .big.fast { color: #34a853; }
+    .result .big.slow { color: #f9a825; }
+    .result .big.very-slow { color: #ea4335; }
+    .detail { font-size: 13px; color: #666; margin-top: 4px; }
+    .info { margin-top: 16px; font-size: 12px; color: #aaa; }
+    .history {
+      margin-top: 16px;
+      padding-top: 12px;
       border-top: 1px solid #eee;
-      padding-top: 16px;
+      font-size: 12px;
+      color: #888;
+      text-align: left;
+      max-height: 150px;
+      overflow-y: auto;
     }
-    .badge {
-      display: inline-block;
-      padding: 4px 16px;
-      border-radius: 20px;
-      font-size: 13px;
-      margin-top: 8px;
+    .history .item {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      border-bottom: 1px solid #f5f5f5;
     }
-    .badge.fast { background: #e8f5e9; color: #2e7d32; }
-    .badge.slow { background: #fff3e0; color: #e65100; }
+    .history .item .time { color: #aaa; }
+    .history .item .speed { font-weight: 600; }
+    .history .item .speed.fast { color: #34a853; }
+    .history .item .speed.slow { color: #f9a825; }
+    .history .item .speed.very-slow { color: #ea4335; }
   </style>
 </head>
 <body>
+
   <div class="card">
-    <h1>🌍 Vercel 测试</h1>
-    <p class="sub">检测从沙特访问 Vercel 部署的网页速度</p>
+    <h1>✏️ Google Sheets 写入速度测试</h1>
+    <p class="sub">Vercel → Google Sheets 实际写入耗时</p>
 
-    <div class="status" id="status">点击下方按钮测试</div>
+    <button id="btn" onclick="testWrite()">🚀 测试写入</button>
 
-    <div class="time" id="timeDisplay">--</div>
-    <div class="sub" id="detail"></div>
+    <div class="result" id="result">点击按钮开始测试</div>
+    <div class="info" id="info">等待测试...</div>
 
-    <button onclick="testSpeed()">🚀 测试访问速度</button>
-
-    <div id="badgeArea"></div>
-
-    <div class="info">
-      <span id="location">📍 检测中...</span><br>
-      <span id="timestamp"></span>
+    <div class="history" id="history">
+      <div style="color:#bbb;text-align:center;">暂无记录</div>
     </div>
   </div>
 
   <script>
-    async function testSpeed() {
-      const status = document.getElementById('status');
-      const timeDisplay = document.getElementById('timeDisplay');
-      const detail = document.getElementById('detail');
-      const badgeArea = document.getElementById('badgeArea');
-      const location = document.getElementById('location');
+    let historyData = [];
 
-      status.textContent = '⏳ 正在测试...';
-      timeDisplay.textContent = '...';
-      detail.textContent = '';
-      badgeArea.innerHTML = '';
+    async function testWrite() {
+      const btn = document.getElementById('btn');
+      const resultDiv = document.getElementById('result');
+      const infoDiv = document.getElementById('info');
+
+      btn.disabled = true;
+      btn.textContent = '⏳ 写入中...';
+      resultDiv.className = 'result';
+      resultDiv.textContent = '⏳ 正在向 Google Sheets 写入数据...';
 
       const startTime = performance.now();
 
       try {
-        // 测试1：获取地理位置信息（使用 ip-api.com，对中东网络友好）
-        const geoResp = await fetch('https://ip-api.com/json/', {
-          signal: AbortSignal.timeout(8000)
-        });
-        const geoData = await geoResp.json();
-        const city = geoData.city || '未知';
-        const country = geoData.country || '未知';
-        const isp = geoData.isp || '未知';
-        location.textContent = `📍 ${city}, ${country} | ${isp}`;
-
-        // 测试2：从Vercel加载数据（加随机参数防止缓存）
-        const testUrl = window.location.href + '?t=' + Date.now();
-        const resp = await fetch(testUrl, {
-          method: 'HEAD',
-          cache: 'no-cache',
-          signal: AbortSignal.timeout(10000)
+        const response = await fetch('/api/write-sheet', {
+          cache: 'no-cache'
         });
 
+        const data = await response.json();
+        const endTime = performance.now();
+        const frontendElapsed = ((endTime - startTime) / 1000).toFixed(2);
+
+        // 显示结果
+        const seconds = parseFloat(data.elapsedSeconds) || 0;
+        let bigClass = 'fast';
+        let speedDesc = '极快';
+        if (seconds > 10) { bigClass = 'very-slow'; speedDesc = '很慢'; }
+        else if (seconds > 5) { bigClass = 'slow'; speedDesc = '较慢'; }
+
+        resultDiv.className = 'result success';
+        resultDiv.innerHTML = `
+          <div class="big ${bigClass}">${data.elapsedSeconds || '--'} 秒</div>
+          <div>✅ Vercel → Google Sheets 写入成功</div>
+          <div class="detail">⏱️ 后端耗时: ${data.elapsedMs || '--'} ms | 前端总耗时: ${frontendElapsed} s</div>
+          <div class="detail">📡 HTTP: ${data.httpStatus || '--'}</div>
+          <div class="detail">📄 写入行号: ${data.data?.row || '--'} | 写入内容: ${data.data?.name || '--'}</div>
+        `;
+
+        infoDiv.textContent = `测试时间: ${new Date().toLocaleString('zh-CN')} | 速度评级: ${speedDesc}`;
+
+        // 记录历史
+        historyData.push({
+          time: new Date().toLocaleTimeString('zh-CN'),
+          seconds: seconds,
+          speedDesc: speedDesc,
+          bigClass: bigClass,
+          success: true
+        });
+        renderHistory();
+
+      } catch (error) {
         const endTime = performance.now();
         const elapsed = ((endTime - startTime) / 1000).toFixed(2);
 
-        timeDisplay.textContent = elapsed + 's';
-        status.textContent = '✅ 加载完成';
+        resultDiv.className = 'result error';
+        resultDiv.innerHTML = `
+          <div>❌ 写入失败</div>
+          <div class="detail">错误: ${error.message}</div>
+          <div class="detail">⏱️ 耗时: ${elapsed} 秒</div>
+        `;
+        infoDiv.textContent = `测试时间: ${new Date().toLocaleString('zh-CN')} | 请检查网络或 API 配置`;
 
-        let badgeText, badgeClass;
-        if (elapsed < 1) {
-          badgeText = '🚀 极快 (Vercel CDN 命中)';
-          badgeClass = 'fast';
-        } else if (elapsed < 3) {
-          badgeText = '⚡ 较快 (CDN 节点较近)';
-          badgeClass = 'fast';
-        } else if (elapsed < 6) {
-          badgeText = '📡 一般 (节点可能较远)';
-          badgeClass = 'slow';
-        } else {
-          badgeText = '🐢 较慢 (可能需要优化)';
-          badgeClass = 'slow';
-        }
-        badgeArea.innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span>`;
-        detail.textContent = `从 Vercel 获取页面耗时 ${elapsed} 秒`;
-
-        document.getElementById('timestamp').textContent =
-          `测试时间: ${new Date().toLocaleString('zh-CN')}`;
-
-      } catch (err) {
-        // 如果 IP 查询失败，仍然尝试测试页面加载速度
-        if (err.message.includes('ip-api') || err.name === 'AbortError') {
-          // IP查询失败，用备用方法
-          try {
-            const testUrl = window.location.href + '?t=' + Date.now();
-            const resp = await fetch(testUrl, {
-              method: 'HEAD',
-              cache: 'no-cache',
-              signal: AbortSignal.timeout(10000)
-            });
-            const endTime = performance.now();
-            const elapsed = ((endTime - startTime) / 1000).toFixed(2);
-            timeDisplay.textContent = elapsed + 's';
-            status.textContent = '✅ 加载完成 (位置信息获取失败)';
-            location.textContent = '📍 位置信息获取失败，但速度测试正常';
-            let badgeText, badgeClass;
-            if (elapsed < 1) { badgeText = '🚀 极快'; badgeClass = 'fast'; }
-            else if (elapsed < 3) { badgeText = '⚡ 较快'; badgeClass = 'fast'; }
-            else if (elapsed < 6) { badgeText = '📡 一般'; badgeClass = 'slow'; }
-            else { badgeText = '🐢 较慢'; badgeClass = 'slow'; }
-            badgeArea.innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span>`;
-            detail.textContent = `从 Vercel 获取页面耗时 ${elapsed} 秒`;
-            document.getElementById('timestamp').textContent =
-              `测试时间: ${new Date().toLocaleString('zh-CN')}`;
-            return;
-          } catch (e2) {
-            // 完全失败
-          }
-        }
-        status.textContent = '❌ 测试失败: ' + err.message;
-        timeDisplay.textContent = '--';
-        detail.textContent = '请检查网络连接，或手动刷新重试';
+        historyData.push({
+          time: new Date().toLocaleTimeString('zh-CN'),
+          seconds: elapsed,
+          speedDesc: '失败',
+          bigClass: 'very-slow',
+          success: false
+        });
+        renderHistory();
       }
+
+      btn.disabled = false;
+      btn.textContent = '🚀 再次测试';
     }
 
-    window.onload = function() {
-      // 尝试获取位置
-      fetch('https://ip-api.com/json/')
-        .then(r => r.json())
-        .then(data => {
-          document.getElementById('location').textContent =
-            `📍 ${data.city || '未知'}, ${data.country || '未知'}`;
-        })
-        .catch(() => {
-          document.getElementById('location').textContent = '📍 无法获取位置（不影响速度测试）';
-        });
-
-      setTimeout(testSpeed, 1000);
-    };
+    function renderHistory() {
+      const historyDiv = document.getElementById('history');
+      if (historyData.length === 0) {
+        historyDiv.innerHTML = '<div style="color:#bbb;text-align:center;">暂无记录</div>';
+        return;
+      }
+      let html = '';
+      const show = historyData.slice(-10).reverse();
+      for (const h of show) {
+        const status = h.success ? '✅' : '❌';
+        const speedClass = h.bigClass || 'fast';
+        html += `<div class="item">
+          <span>${status} ${h.time}</span>
+          <span class="speed ${speedClass}">${h.success ? h.seconds + 's' : h.speedDesc}</span>
+        </div>`;
+      }
+      historyDiv.innerHTML = html;
+    }
   </script>
 </body>
 </html>
